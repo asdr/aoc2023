@@ -1,10 +1,7 @@
 (in-package :aoc)
 
-(defvar *day8-input-file-path* #P"input8.txt")
-
-
-(defun day8-load-instructions ()
-  (with-open-file (stream *day8-input-file-path*)
+(defun day8-load-instructions (&optional is-for-test)
+  (with-open-file (stream (if is-for-test #P"input8_test.txt" #P"input8.txt"))
     (let ((instructions (read-line stream nil)))
       (read-line stream nil)
       (let ((path-data nil))
@@ -60,16 +57,6 @@
         (setf starting-nodes (cons node starting-nodes))))))
 
 
-
-#||(labels ((starting-nodes (nodes acc)
-(progn                              ;
-(format t "~a~%" (mapcar #'car nodes)) ;
-(when nodes                         ;
-(if (ends-with (caar nodes) "A")    ;
-(starting-nodes (cdr nodes) (cons (car nodes) acc)) ;
-(starting-nodes (cdr nodes) acc)))  ;
-acc)))                              ;
-(starting-nodes path-data nil)))|#
 
 (defun ends-with-Z (instruction nodes)
   (every #'(lambda(n)
@@ -351,3 +338,32 @@ acc)))                              ;
       (format t "~A | " (aref **last-step** i)))
     (format t "~%")
     (sleep 10)))
+
+(defun day8-part2-lcm ()
+  (multiple-value-bind (instructions path-data)
+      (day8-load-instructions)
+    (let ((current-steps (find-starting-nodes path-data))
+          (instruction-list (coerce instructions 'list))
+          (found-steps nil))
+
+      (dolist (path current-steps)
+        (let ((step-count 1))
+
+          (setf found-steps (cons (block tb
+                                    (tagbody
+                                     traverse-starts
+                                       (when (and
+                                              (null (dolist (instruction instruction-list nil)
+                                        ;(format t "~A(~A): ~A~%" instruction step-count path)
+                                                      (if (not (ends-with-Z instruction (list path)))
+                                                          (progn
+                                                            (incf step-count)
+                                                            (setf path (car (next-step instruction (list path) path-data))))
+                                                          (return t))))
+                                              t)
+                                         (go traverse-starts))
+                                       (return-from tb step-count)))
+                                  found-steps))))
+
+      (format t "Found: ~A~%" found-steps)
+      (format t "Result: ~A~%" (apply #'lcm found-steps)))))
