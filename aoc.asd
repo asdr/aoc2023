@@ -24,4 +24,5 @@
                (:file "day7-part2")
                (:file "day8")
                (:file "day9")
+               (:file "day10")
                ))
