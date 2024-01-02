@@ -187,8 +187,6 @@
                         :initial-run t)
         graph))))
 
-
-
 (defun day10-part2 (&key is-test)
   (let* ((*maze-data* (day10-load :load-test is-test))
          (*maze-dimensions* (array-dimensions *maze-data*)))
@@ -197,30 +195,50 @@
                                       :if-exists :supersede
                                       :if-does-not-exist :create)
       (let ((new-maze (make-array *maze-dimensions* :element-type 'character :initial-element #\.))
-            (graph (create-graph :starting-pipe (if is-test #\F #\|)))) ;; TODO: fix starting pipe
+            (graph (create-graph :starting-pipe (if is-test #\F #\|))) ;; TODO: fix starting pipe
+            (total-number 0))
         (traverse-graph graph
                         #'(lambda(n)
                             (setf (aref new-maze (caar n) (cadar n)) (node-get-char n)))
                         :initial-run t)
         (loop for row from 0 to (1- (car *maze-dimensions*))
-              do (loop for column from 0 to (1- (cadr *maze-dimensions*))
-                       do (progn
-                            (format *output-stream* "~a" (aref new-maze row column))
-                            (when (= column (1- (cadr *maze-dimensions*)))
-                              (format *output-stream* "~%")))))))))
+              do (let ((row-stack nil))
+                   (loop for column from 0 to (1- (cadr *maze-dimensions*))
+                         do (let ((ch (aref new-maze row column)))
 
+                              (when (position ch "|JF7L" :test #'char=)
+                                (if (null row-stack)
+                                    (setf row-stack (cons ch row-stack))
+                                    (let ((peek (car row-stack)))
+                                      (cond ((and (char= peek #\L) (char= ch #\J))
+                                             (setf row-stack (cdr row-stack)))
 
-#||(defun day10-part2-find()
-(with-open-file (*output-stream* #P"output10-part2.txt"
-:direction :output
-:if-exists :supersede
-:if-does-not-exist :create)
-(let ((new-maze (make-array '(140 140) )))
-(traverse-graph (gethash '(60 75) (create-graph))
-#'(lambda(n)
-(format aoc::*output-stream*
-"~A: ~A~%"
-(car n)
-(funcall (caddr n) :operation :get)))
-:initial-run t))))
-|#
+                                            ((and (char= peek #\F) (char= ch #\7))
+                                             (setf row-stack (cdr row-stack)))
+
+                                            ((and (char= peek #\L) (char= ch #\7))
+                                             (if (cdr row-stack)
+                                                 (setf row-stack nil)
+                                                 (setf row-stack (list #\|))))
+
+                                            ((and (char= peek #\F) (char= ch #\J))
+                                             (if (cdr row-stack)
+                                                 (setf row-stack nil)
+                                                 (setf row-stack (list #\|))))
+
+                                            ((char= ch #\|)
+                                             (setf row-stack (cdr row-stack)))
+
+                                            (t
+                                             (setf row-stack (cons ch row-stack)))))))
+
+                              (let ((new-ch ch))
+                                (when (char= ch #\.)
+                                  (when row-stack
+                                    (setf new-ch #\O)
+                                    (incf total-number)))
+                                (format *output-stream* "~a" new-ch))
+
+                              (when (= column (1- (cadr *maze-dimensions*)))
+                                (format *output-stream* "~%"))))))
+        (format *output-stream* "~%~%Total: ~A~%" total-number)))))
