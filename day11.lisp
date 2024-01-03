@@ -54,15 +54,15 @@
           (setf galaxies (cons (list (incf index) row column) galaxies)))))
     galaxies))
 
-(defun expand-universe(galaxies)
+(defun expand-universe(galaxies &optional (coefficient 2))
   (let ((er (find-empty-rows))
         (ec (find-empty-columns))
         (expanded nil))
     (dolist (g galaxies)
       (setf expanded (cons (list
                             (car g)
-                            (+ (cadr g) (length (remove-if #'(lambda(c) (> c (cadr g))) er)))
-                            (+ (caddr g) (length (remove-if #'(lambda(r) (> r (caddr g))) ec))))
+                            (+ (cadr g) (* (1- coefficient) (length (remove-if #'(lambda(c) (> c (cadr g))) er))))
+                            (+ (caddr g) (* (1- coefficient) (length (remove-if #'(lambda(r) (> r (caddr g))) ec)))))
                            expanded)))
     expanded))
 
@@ -93,3 +93,20 @@
                             (+ (abs (- x2 x1))
                                (abs (- y2 y1)))))
                       (get-combinations (expand-universe galaxies)))))))
+
+(defun day11-part2(&key is-test (coefficient 2))
+  (let ((*day11-data-row-count* 0)
+        (*day11-data-column-count* 0)
+        (*day11-data* nil))
+    (day11-load-input :is-test is-test)
+    ;; (format t "~a~%" *day11-data-row-count*)
+    ;; (format t "~a~%" *day11-data-column-count*)
+    (let ((galaxies (find-all-galaxies)))
+      ;;(format t "~a~%" galaxies)
+      (reduce #'+
+              (mapcar #'(lambda(pair)
+                          (destructuring-bind ((n1 x1 y1) (n2 x2 y2))
+                              pair
+                            (+ (abs (- x2 x1))
+                               (abs (- y2 y1)))))
+                      (get-combinations (expand-universe galaxies coefficient)))))))
