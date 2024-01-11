@@ -1,4 +1,10 @@
-(in-package :aoc)
+\(defpackage :aoc/day12
+  (:nicknames :aoc/day12 :aoc.day12)
+  (:use :cl)
+  (:export
+   ))
+
+(in-package :aoc/day12)
 
 (defvar *day12-data* nil)
 (defvar **day12-permutations** (make-array 20))
@@ -107,3 +113,85 @@
 		  ;(format t " failed~%")
 		  ))))))
     total))
+
+(defun is-valid (expected data)
+  (labels ((find-max-group-count (d)
+	     (let ((len (length d)))
+	       (loop for i from -1 to (- len 2)
+		     for j from 0 to (- len 1) do
+		       (let ((prev (when (> i -1) (char d i)))
+			     (cur (char d j)))
+			 (when (char= cur #\?)
+			   (if (or (null prev) (char= prev #\.))
+			       (setf (aref d j) #\#)
+			       (setf (aref d j) #\.)))))
+	       (1+ (length (position-all #\. (cl-ppcre:regex-replace-all "[.]+" (string-trim "." d) ".")))))))
+    (let ((input-data (copy-seq data)))
+      (>= (find-max-group-count input-data) expected))))
+
+(defun traverse-node (fn &key props accessor (hist (make-hash-table :test 'equal)))
+  (unless (gethash (car props) hist)
+    (setf (gethash (car props) hist) t)
+    (when (and props (third props))
+      (funcall fn props)
+      (loop for i from 0 to (1- (cadr props)) do
+	(destructuring-bind (c-props c-accessor c-traverser)
+	    (funcall accessor i)
+	  (declare (ignore c-traverser))
+	  (traverse-node fn :props c-props :accessor c-accessor :hist hist))))))
+
+(defun ncreate-node (data expected &optional (level 0) (table (make-hash-table :test 'equal)))
+  (let ((_data (copy-seq data))
+	(_children (make-array 300))
+	(_children-count 0))
+    (let ((_valid (is-valid expected _data)))
+      (when (and _data _valid)
+	(let ((node (gethash _data table)))
+	  (if node
+	      node
+	      (progn
+		;(format t "create: ~A[~A][is-valid:~a]~%" data level _valid)
+		(let ((positions (position-all #\? _data)))
+		  (loop for pos in positions do
+		    (setf data (replace data "#" :start1 pos))
+		    (let ((child (ncreate-node (copy-seq data) expected (1+ level) table)))
+		      (when child
+			(setf (aref _children _children-count) child)
+			(incf _children-count)))
+		    (setf data (replace data "." :start1 pos))
+		    (let ((child (ncreate-node (copy-seq data) expected (1+ level) table)))
+		      (when child
+			(setf (aref _children _children-count) child)
+			(incf _children-count)))
+		    (setf data (replace data "?" :start1 pos))))
+		(let ((props (list _data _children-count _valid))
+		      (accessor #'(lambda (index)
+				    (when (< index _children-count)
+				      (aref _children index)))))
+		  (setf (gethash _data table)
+			(list props
+			      accessor
+			      #'(lambda (fn)
+				  (traverse-node fn :props props :accessor accessor))))))))))))
+
+(defun day12-part2(&key is-test)
+  (let ((total 0))
+    (day12-load-input :is-test is-test)
+    (let ((initial-groups (find-initial-groups)))
+      (dolist (g initial-groups)
+        (format t "~a~%" g)
+	(funcall
+	 (third
+	  (aoc/day12::ncreate-node (third g) (length (car g))))
+	 
+	 #'(lambda(props)
+	     (when (and (third props)
+			(zerop (cadr props)))
+	       (let ((d (car props)))
+		 (when (equal (car g)
+			      (mapcar #'length (cl-ppcre:split "[.]+" (string-trim "." d))))
+		   (format t "~a~%" d)
+		   (incf total))))))
+	))
+    total))
+
