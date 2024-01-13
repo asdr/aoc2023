@@ -1,4 +1,4 @@
-\(defpackage :aoc/day12
+(defpackage :aoc/day12
   (:nicknames :aoc/day12 :aoc.day12)
   (:use :cl)
   (:export
