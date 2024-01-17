@@ -1,9 +1,9 @@
-(defpackage :aoc/day13
-  (:nicknames :aoc/day13)
+(defpackage :aoc/day13/part2
+  (:nicknames :aoc/day13/part2)
   (:use :cl)
   (:export #:solve))
 
-(in-package :aoc/day13)
+(in-package :aoc/day13/part2)
 
 (defvar *patterns* nil)
 
@@ -35,24 +35,43 @@
           (setf patterns (cons (list (car pattern) (reverse columns)) patterns))))
     (setf *patterns* patterns)))
 
-(defun mirror? (string-list index)
+(defun calculate-diff (s1 s2)
+  (let ((diff 0))
+    (block outer
+      (when (and s1 s2)
+        (let ((l1 (length s1)))
+          (loop for i from 0 to (1- l1) do
+                (unless (char= (char s1 i) (char s2 i))
+                  (incf diff)
+                  (when (> diff 1)
+                    (return-from outer)))))))
+        diff))
+
+(defun mirror? (string-list index &key allow-null)
   ;; (format t "mirror? ~A~%" index)
-  ;; (format t "string-list: ~A~%" string-list)
+  ;; (format t "~A~%" string-list)
   (when index
-    (loop for i downfrom index to 1 
-          for k from (1+ index) to (length string-list) do
-          (progn
-            ;; (format t "~a,~a: ~a =? ~a ~%" i k (nth (1- i) string-list) (nth (1- k) string-list))
-            (unless (string= (nth (1- i) string-list) (nth (1- k) string-list))
-              (return-from mirror? nil))))
-      t))
+    (let ((diffs nil))
+      (loop for i downfrom index to 1 
+          for k from (+ index 1) to (length string-list) do
+          (let ((x (nth (1- i) string-list))
+                (y (nth (1- k) string-list)))
+            (let ((diff (calculate-diff x y)))
+              ;; (format t "~a,~a: ~a =? ~a (diff: ~a)~%" i k x y diff)
+              (unless (string= x y)
+                (if (> (length diffs) 1)
+                    (return-from mirror? nil)
+                    (setf diffs (cons diff diffs)))))))
+          (and diffs (= (car diffs) 1)))))
 
 (defun find-successive-duplicate (string-list)
   (loop with previous = (first string-list)
         for string in (rest string-list)
         for index from 1
-        when (and (string= previous string) 
-                  (mirror? string-list index))
+        when (or (and (string= previous string)
+                      (mirror? string-list index :allow-null t))
+                 (and (= (calculate-diff previous string) 1)
+                      (mirror? string-list index :allow-null nil)))
         return (list string index)
         do (setf previous string)))
 
@@ -60,10 +79,10 @@
   (let ((h-location (find-successive-duplicate (car pattern))))
     (if h-location
         (progn
-          (format t "h: ~A~%" h-location)
+          ;; (format t "found: h: ~A~%" h-location)
           (list 'h (cadr h-location)))
         (let ((v-location (find-successive-duplicate (cadr pattern))))
-          (format t "v: ~A~%" v-location)
+          ;; (format t "found v: ~A~%" v-location)
           (when v-location
             (list 'v (cadr v-location)))))))
 
@@ -79,11 +98,13 @@
         (total 0))
     (load-input :is-test is-test)
     (loop for pattern in *patterns* do
+          ;; (format t "Pattern: ~a~%" pattern)
           (let ((row-count (length (car pattern)))
                 (column-count (length (cadr pattern)))
                 (mirror-location (find-mirror pattern)))
-            (format t "mirror: ~a [~a,~a]~%" mirror-location row-count column-count)
+            (format t "found-mirror-location: ~a [~a,~a]~%" mirror-location row-count column-count)
             (setf total (+ total (calculate-points row-count column-count mirror-location)))))
+    (format t "Total: ~A~%" total)
     total))
 
 
