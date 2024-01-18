@@ -1,7 +1,7 @@
 (defpackage :aoc/day14
   (:nicknames :aoc/day14)
   (:use :cl)
-  (:export #:solve))
+  (:export #:solve #:solve-part2))
 
 (in-package :aoc/day14)
 
@@ -81,3 +81,27 @@
     ;; (format *output-stream* "~A~%" *platform*)
     (calculate-total-load)))
 
+(defvar *cache* nil)
+
+(defun spin-cycle-platform()
+  (let ((before *platform*))
+    (let ((saved (gethash before *cache*)))
+      (if saved
+          (setf *platform* saved)
+          (progn
+            ;; (setf before (copy-seq *platform*))
+            (tilt-platform :direction :north)
+            (tilt-platform :direction :west)
+            (tilt-platform :direction :south)
+            (tilt-platform :direction :east)
+            (setf (gethash before *cache*) *platform*))))))
+
+ (defun solve-part2 (&key is-test (cycle-count 1))
+   (let ((*platform* nil)
+         (*cache* (make-hash-table :test #'equal)))
+     (load-input :is-test is-test)
+     (loop for i from 1 to cycle-count do
+           (spin-cycle-platform))
+     (calculate-total-load)))
+
+ 
