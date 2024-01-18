@@ -20,7 +20,7 @@
           (loop for j from 0 to (1- column-count) do
                 (setf (aref *grid* i j) (char (nth i *grid-data*) j))))))
 
-(defun traverse-grid()
+(defun traverse-grid (starting-point direction)
   (let ((dimensions (array-dimensions *grid*))
         (traversed (make-hash-table :test #'equal)))
     (labels ((traverse (x y direction fn)
@@ -85,8 +85,8 @@
                                  (traverse (1+ x) y :right fn)))))))))
       (let ((count 0)
             (energized (make-hash-table :test #'equal)))
-        (traverse 0 0 :right #'(lambda(ch x y direction)
-                                 (format t "~a (~a,~a) ~a~%" ch x y direction)
+        (traverse (car starting-point) (cadr starting-point) direction #'(lambda(ch x y direction)
+                                 ;; (format t "~a (~a,~a) ~a~%" ch x y direction)
                                  (let ((passed (gethash (list x y) energized)))
                                    (if (not passed)
                                      (progn
@@ -94,14 +94,32 @@
                                        (setf (gethash (list x y) energized) 1))
                                      (setf (gethash (list x y) energized) (1+ passed))))
                                  t))
-        (format t "Energized: ~a~%" count)))))
+        ;; (format t "Energized: ~a~%" count)
+        count))))
 
 
 (defun solve (&key is-test)
   (let ((*grid-data* nil)
         (*grid* nil))
     (load-input :is-test is-test)
-    (format t "~a~%" *grid*)
-    (traverse-grid)))
+    ;; (format t "~a~%" *grid*)
+    (traverse-grid '(0 0) :right)))
+
+(defun solve-part2 (&key is-test)
+  (let ((*grid-data* nil)
+        (*grid* nil)
+        (max-energized 0))
+    (load-input :is-test is-test)
+    ;; (format t "~a~%" *grid*)
+    (let ((len (length *grid-data*)))
+      (loop for i from 0 to (1- len) do
+            (setf max-energized (max max-energized (traverse-grid (list i 0) :down)))
+            (setf max-energized (max max-energized (traverse-grid (list (- len i 1) 0) :up)))
+            (setf max-energized (max max-energized (traverse-grid (list 0 i) :right)))
+            (setf max-energized (max max-energized (traverse-grid (list 0 (- len i 1)) :left)))
+            ;; (format t "~a~%" max-energized)
+            ))
+    (format t "Max: ~A~%" max-energized)))
+
 
 
