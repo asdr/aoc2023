@@ -32,5 +32,6 @@
                (:file "day13-part2")
                (:file "day14")
                (:file "day15")
+               (:file "day16")
                ))
 
