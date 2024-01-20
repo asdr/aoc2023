@@ -18,16 +18,27 @@
 (defvar *max-weight* nil)
 (defvar *thread-data* nil)
 (defvar *mutex* nil)
-                           
+(defvar *mutex2* nil)
+(defvar **end** nil)
+
 (defun dijkstra-short-path (from to)
   (setf *r* nil)
   (paths-1 from to 0 `(,from))
-  (sleep 2)
-  (consume-threads)
-  ;; (format t "td: ~A~%" *thread-data*)
+  (sleep 0.1)
+  (sb-thread:make-thread #'clean-r :name "Thread-Clean")
+  (sb-thread:join-thread (sb-thread:make-thread #'consume-threads :name "Thread-Consume"))
+  (setf **end** t)
   (let ((found (sort *r* #'< :key #'cadr)))
-    (format t "~A" found)
     (car found)))
+
+
+(defun clean-r ()
+  (loop while (not **end**)
+        do (sleep 5)
+        do (sb-thread:with-mutex (*mutex2*)
+                                 (when *r*
+                                  (setf *r* (list (car (sort *r* #'< :key #'cadr))))
+                                  (setf *max-weight* (cadar *r*))))))
 
 (defun queue-thread (from to acc-weigth trail)
   (sb-thread:with-mutex (*mutex*)
@@ -35,43 +46,60 @@
 
 (defun consume-threads()
     (loop while *thread-data*
-          do (sleep 0.3)
-          do (sb-thread:with-mutex (*mutex*)
-                                   (sb-thread:make-thread #'paths-1 :arguments (car *thread-data*))
-                                   (setf *thread-data* (cdr *thread-data*)))))
+          ;; do (sleep 0.0001)
+          do (let ((args nil))
+               (sb-thread:with-mutex (*mutex*)
+                                     (setf args (car *thread-data*))
+                                     (setf *thread-data* (cdr *thread-data*)))
+               (apply #'paths-1 args))))
+
+(defun valid? (trail)
+  (let ((len (length trail)))
+    (cond ((< len 4) (values t nil))
+          (t (let ((diff1 (- (second trail) (first trail)))
+                   (diff2 (- (third trail) (second trail)))
+                   (diff3 (- (fourth trail) (third trail))))
+               (if (not (= diff1 diff2 diff3))
+                   (values t nil)
+                   (values nil diff1)))))))
+             
 
 (defun paths-1 (from to acc-weigth trail)
-    (format t "~a ~a ~a ~a~%" from to acc-weigth trail)
+    ;; (format t "~a ~a ~a ~a~%" from to acc-weigth trail)
     (if (eql from to) ;;found 
-        (push `(,(reverse trail) ,(setf *max-weight* acc-weigth)) *r*)
-        (when (< acc-weigth *max-weight*)
-          (loop for edge in (nodes from) 
-                for edge-to = (cadr edge) do
-                (unless (member edge-to trail)
-                  (sb-thread:make-thread #'queue-thread :arguments (list edge-to to (+ (cddr edge) acc-weigth) (cons edge-to trail))))))))
+        (sb-thread:with-mutex (*mutex2*)
+                              (push `(,(reverse trail) ,(setf *max-weight* acc-weigth)) *r*))
+        (let ((mw nil))
+          (sb-thread:with-mutex (*mutex2*) (setf mv *max-weight*))
+          (when (and (valid? trail)
+                     (< acc-weigth mv))
+            (loop for edge in (nodes from) 
+                  for edge-to = (cadr edge) do
+                  (unless (member edge-to trail)
+                    (apply #'queue-thread (list edge-to to (+ (cddr edge) acc-weigth) (cons edge-to trail)))))))))
  
 (defun nodes (vertex-id)
   (sort (cdr (assoc vertex-id *w*)) #'< :key #'cddr))
 
-(defun dijkstra-short-paths (z w) 
-  (loop for (a b) in (loop for v on z nconc
-                           (loop for e in (cdr v)
-                                 collect `(,(car v) ,e)))
-        do (setf *r* nil) (paths-2 w a b 0 `(,a))
-        (format t "~{Path: ~A  Distance: ~A~}~%"
-                (car (sort *r* #'< :key #'cadr)))))
- 
-(defun paths-2 (w c g z v)
-  (if (eql c g) (push `(,(reverse v) ,z) *r*)
-      (loop for a in (sort (cdr (assoc c w)) #'< :key #'cddr)
-            for b = (cadr a) do (unless (member b v)
-                                  (paths-2 w b g (+ (cddr a) z)
-                                         (cons b v))))))
+;; (defun dijkstra-short-paths (z w) 
+;;   (loop for (a b) in (loop for v on z nconc
+;;                            (loop for e in (cdr v)
+;;                                  collect `(,(car v) ,e)))
+;;         do (setf *r* nil) (paths-2 w a b 0 `(,a))
+;;         (format t "~{Path: ~A  Distance: ~A~}~%"
+;;                 (car (sort *r* #'< :key #'cadr)))))
+;;  
+;; (defun paths-2 (w c g z v)
+;;   (if (eql c g) (push `(,(reverse v) ,z) *r*)
+;;       (loop for a in (sort (cdr (assoc c w)) #'< :key #'cddr)
+;;             for b = (cadr a) do (unless (member b v)
+;;                                   (paths-2 w b g (+ (cddr a) z)
+;;                                          (cons b v))))))
 
 (defun test-dijkstra ()
   (format t "Shortest path a-> e: ~A~%" (dijkstra-short-path "a" "e"))
-  (dijkstra-short-paths '("a" "b" "c" "d" "e" "f")
-                        *w*))
+  ;; (dijkstra-short-paths '("a" "b" "c" "d" "e" "f") *w*)
+  )
 ;; end of Dijkstra's shortest path
 
 (defparameter **input-path** #P"input17.txt")
@@ -135,10 +163,12 @@
   (setf *max-weight* (if max-weight max-weight (calculate-starting-weight)))
   (setf *thread-data* nil)
   (setf *mutex* (sb-thread:make-mutex :name "thread-data-lock"))
+  (setf *mutex2* (sb-thread:make-mutex :name "r-lock"))
+  (setf **end** nil)
   
   (let ((width (load-input :is-test is-test)))
-    (format t "Width: ~A~%" width)
-    (format t "W: ~A~%" *w*)
+    ;; (format t "Width: ~A~%" width)
+    ;; (format t "W: ~A~%" *w*)
     (find-shortest-path width :target target)))
 
 
