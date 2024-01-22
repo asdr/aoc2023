@@ -41,16 +41,16 @@
                                   (setf *max-weight* (cadar *r*))))))
 
 (defun queue-thread (from to acc-weigth trail)
-  (sb-thread:with-mutex (*mutex*)
-                          (setf *thread-data* (append *thread-data* (list (list from to acc-weigth trail))))))
+  ;; (sb-thread:with-mutex (*mutex*)
+                          (setf *thread-data* (append *thread-data* (list (list from to acc-weigth trail)))))
 
 (defun consume-threads()
     (loop while *thread-data*
           ;; do (sleep 0.0001)
           do (let ((args nil))
-               (sb-thread:with-mutex (*mutex*)
+               ;; (sb-thread:with-mutex (*mutex*)
                                      (setf args (car *thread-data*))
-                                     (setf *thread-data* (cdr *thread-data*)))
+                                     (setf *thread-data* (cdr *thread-data*))
                (apply #'paths-1 args))))
 
 (defun valid? (trail)
